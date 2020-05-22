@@ -1,0 +1,101 @@
+{
+  "objects": [
+    {
+      "period": "1 days",
+      "name": "Every 1 day",
+      "id": "DefaultSchedule",
+      "type": "Schedule",
+      "startAt": "FIRST_ACTIVATION_DATE_TIME"
+    },
+    {
+      "failureAndRerunMode": "CASCADE",
+      "schedule": {
+        "ref": "DefaultSchedule"
+      },
+      "resourceRole": "DataPipelineDefaultResourceRole",
+      "role": "DataPipelineDefaultRole",
+      "pipelineLogUri": "#{myLogUri}",
+      "scheduleType": "cron",
+      "name": "Default",
+      "id": "Default"
+    },
+    {
+      "output": {
+        "ref": "S3BackupLocation"
+      },
+      "input": {
+        "ref": "DDBSourceTable"
+      },
+      "maximumRetries": "2",
+      "name": "TableBackupActivity",
+      "step": "s3://elasticmapreduce/libs/script-runner/script-runner.jar,s3://elasticmapreduce/libs/hive/hive-script,--run-hive-script,--hive-versions,latest,--args,-f,#{s3ScriptLocation},-d,DYNAMODB_INPUT_TABLE=#{input.tableName},-d,S3_OUTPUT_BUCKET=#{output.directoryPath}/#{format(@scheduledStartTime,'YYYY-MM-dd_hh.mm')},-d,DYNAMODB_READ_AMOUNT=#{input.myDDBReadThroughput},-d,DYNAMODB_ENDPOINT=dynamodb.#{myDDBRegion}.amazonaws.com",
+      "id": "TableBackupActivity",
+      "runsOn": {
+        "ref": "EmrClusterForBackup"
+      },
+      "type": "EmrActivity",
+      "resizeClusterBeforeRunning": "false"
+    },
+    {
+      "name": "EmrClusterForBackup",
+      "coreInstanceCount": "1",
+      "coreInstanceType": "m3.xlarge",
+      "releaseLabel": "emr-5.29.0",
+      "masterInstanceType": "m3.xlarge",
+      "id": "EmrClusterForBackup",
+      "region": "#{myDDBRegion}",
+      "type": "EmrCluster"
+    },
+    {
+      "name": "DDBSourceTable",
+      "id": "DDBSourceTable",
+      "type": "DynamoDBDataNode",
+      "tableName": "#{myDDBTableName}"
+    },
+    {
+      "directoryPath": "#{myOutputS3Loc}/#{format(@scheduledStartTime, 'YYYY-MM-dd-HH-mm-ss')}",
+      "name": "S3BackupLocation",
+      "id": "S3BackupLocation",
+      "type": "S3DataNode"
+    }
+  ],
+  "parameters": [
+    {
+      "description": "Output S3 folder",
+      "id": "myOutputS3Loc",
+      "type": "AWS::S3::ObjectKey"
+    },
+    {
+      "description": "Source DynamoDB table name",
+      "id": "myDDBTableName",
+      "type": "String"
+    },
+    {
+      "default": "5",
+      "watermark": "Enter the target amount of capacity for the export",
+      "description": "DynamoDB read throughput in capacity units",
+      "id": "myDDBReadThroughput",
+      "type": "Double"
+    },
+    {
+      "default": "us-east-1",
+      "watermark": "us-east-1",
+      "description": "Region of the DynamoDB table",
+      "id": "myDDBRegion",
+      "type": "String"
+    },
+    {
+      "description": "DataPipeline Log Uri",
+      "id": "myLogUri",
+      "type": "String"
+    },
+    {
+      "description": "Hive S3 script location for export to S3",
+      "id": "s3ScriptLocation",
+      "type": "String"
+    }
+  ],
+  "values": {
+    "s3ScriptLocation": "s3://ss-longterm/exportDynamoDBTableToS3Absolute"
+  }
+}

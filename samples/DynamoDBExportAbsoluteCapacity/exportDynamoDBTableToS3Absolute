@@ -1,0 +1,29 @@
+--####################################################################
+--# Export schema-less table from DDB to S3
+--#
+--# Params:
+--#    DYNAMODB_INPUT_TABLE - name of input table
+--#    S3_OUTPUT_BUCKET - output bucket s3 path
+--#    DYNAMODB_READ_AMOUNT - absolute amount of table RCU to use
+--#    DYNAMODB_ENDPOINT - dynamodb service endpoint to use
+--####################################################################
+
+SET dynamodb.endpoint=${DYNAMODB_ENDPOINT};
+SET dynamodb.throughput.read = ${DYNAMODB_READ_AMOUNT};
+
+-- Drop tables
+DROP table dynamodb_table;
+DROP table s3_table;
+
+-- Map DynamoDB Table
+CREATE EXTERNAL TABLE dynamodb_table (item map<string,string>)
+STORED BY 'org.apache.hadoop.hive.dynamodb.DynamoDBStorageHandler'
+TBLPROPERTIES ("dynamodb.table.name" = "${DYNAMODB_INPUT_TABLE}");
+
+-- Create table in S3
+CREATE EXTERNAL TABLE s3_table (item map<string, string>)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n'
+LOCATION '${S3_OUTPUT_BUCKET}';
+
+-- Load S3 Table with data from DynamoDB
+INSERT OVERWRITE TABLE s3_table SELECT * FROM dynamodb_table;
